@@ -1,4 +1,4 @@
-app = 'shutters-dev-cdn'
+app = 'shutters-cdn'
 primary_region = 'lhr'
 
 [build]
