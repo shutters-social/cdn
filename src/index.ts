@@ -9,9 +9,8 @@ class CdnService extends Service {
   protected metricsPrefix = 'shutters_cdn_';
 
   protected setup() {
-    super.setup();
     this.registry.registerMetric(cdnHits);
-
+    super.setup();
     this.app.get('/cdn/:preset/:did/:cid', async c => {
       const { preset, did, cid } = c.req.param();
 
