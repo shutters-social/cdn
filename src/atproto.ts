@@ -1,4 +1,5 @@
 import * as atcuteCid from '@atcute/cid';
+import * as Sentry from '@sentry/bun';
 import {
   getCachedBlobVerification,
   getCachedDidDoc,
@@ -20,28 +21,38 @@ export type DidDocument = {
   service?: { id: string; type: string; serviceEndpoint: string }[];
 };
 
-export const fetchDidDocument = async (did: string) => {
-  const cachedDidDoc = await getCachedDidDoc(did);
-  if (cachedDidDoc) {
-    return cachedDidDoc;
-  }
+export const fetchDidDocument = async (did: string) =>
+  Sentry.startSpan(
+    {
+      op: 'atproto.fetchDid',
+      name: `fetchDid(${did})`,
+      attributes: {
+        'atproto.did': did,
+      },
+    },
+    async _span => {
+      const cachedDidDoc = await getCachedDidDoc(did);
+      if (cachedDidDoc) {
+        return cachedDidDoc;
+      }
 
-  let res: Response;
-  if (did.startsWith('did:plc:')) {
-    res = await fetch(`https://plc.directory/${did}`);
-  } else if (did.startsWith('did:web:')) {
-    res = await fetch(
-      `https://${did.slice('did:web:'.length)}/.well-known/did.json`,
-    );
-  } else {
-    return null;
-  }
+      let res: Response;
+      if (did.startsWith('did:plc:')) {
+        res = await fetch(`https://plc.directory/${did}`);
+      } else if (did.startsWith('did:web:')) {
+        res = await fetch(
+          `https://${did.slice('did:web:'.length)}/.well-known/did.json`,
+        );
+      } else {
+        return null;
+      }
 
-  const didDoc = (await res.json()) as DidDocument;
+      const didDoc = (await res.json()) as DidDocument;
 
-  await setCachedDidDoc(didDoc);
-  return didDoc;
-};
+      await setCachedDidDoc(didDoc);
+      return didDoc;
+    },
+  );
 
 export const getPdsUrl = (didDoc: DidDocument) => {
   const service = didDoc.service?.find(
