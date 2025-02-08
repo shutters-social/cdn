@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/bun';
 import { Service } from '@shutters/shutterkit';
 import { fetchDidDocument, getPdsUrl, pullAndVerifyCid } from './atproto';
+import { cdnHits } from './metrics';
 import { isValidPreset } from './presets';
 import { getBlobCached } from './s3';
 
@@ -9,6 +10,7 @@ class CdnService extends Service {
 
   protected setup() {
     super.setup();
+    this.registry.registerMetric(cdnHits);
 
     this.app.get('/cdn/:preset/:did/:cid', async c => {
       const { preset, did, cid } = c.req.param();
@@ -38,6 +40,9 @@ class CdnService extends Service {
       }
 
       const blobData = await getBlobCached(pdsUrl, did, cid, preset);
+
+      cdnHits.inc({ preset: preset });
+
       return c.body(blobData.stream(), 200, {
         'Content-Type': blobData.type,
       });

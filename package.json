@@ -32,6 +32,7 @@
     "@aws-sdk/lib-dynamodb": "^3.744.0",
     "@hono/sentry": "^1.2.0",
     "@sentry/bun": "^8.54.0",
-    "@shutters/shutterkit": "0.2.2"
+    "@shutters/shutterkit": "0.2.2",
+    "prom-client": "^15.1.3"
   }
 }
