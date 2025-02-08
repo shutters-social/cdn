@@ -1,15 +1,15 @@
-import * as atcuteCid from "@atcute/cid";
-import * as Sentry from "@sentry/bun";
+import * as atcuteCid from '@atcute/cid';
+import * as Sentry from '@sentry/bun';
 import {
   getCachedBlobVerification,
   getCachedDidDoc,
   setCachedBlobVerification,
   setCachedDidDoc,
-} from "./dynamodb";
-import { getBlobCached } from "./s3";
+} from './dynamodb';
+import { getBlobCached } from './s3';
 
 export type DidDocument = {
-  "@context": string[];
+  '@context': string[];
   id: string;
   alsoKnownAs?: string[];
   verificationMethod?: {
@@ -24,24 +24,24 @@ export type DidDocument = {
 export const fetchDidDocument = async (did: string) =>
   Sentry.startSpan(
     {
-      op: "atproto.fetchDid",
+      op: 'atproto.fetchDid',
       name: `${did}`,
       attributes: {
-        "atproto.did": did,
+        'atproto.did': did,
       },
     },
-    async (_span) => {
+    async _span => {
       const cachedDidDoc = await getCachedDidDoc(did);
       if (cachedDidDoc) {
         return cachedDidDoc;
       }
 
       let res: Response;
-      if (did.startsWith("did:plc:")) {
+      if (did.startsWith('did:plc:')) {
         res = await fetch(`https://plc.directory/${did}`);
-      } else if (did.startsWith("did:web:")) {
+      } else if (did.startsWith('did:web:')) {
         res = await fetch(
-          `https://${did.slice("did:web:".length)}/.well-known/did.json`,
+          `https://${did.slice('did:web:'.length)}/.well-known/did.json`,
         );
       } else {
         return null;
@@ -57,15 +57,15 @@ export const fetchDidDocument = async (did: string) =>
 export const getPdsUrl = (didDoc: DidDocument) =>
   Sentry.startSpan(
     {
-      op: "atproto.getPdsUrl",
+      op: 'atproto.getPdsUrl',
       name: `${didDoc.id}`,
       attributes: {
-        "atproto.did": didDoc.id,
+        'atproto.did': didDoc.id,
       },
     },
-    (_span) => {
+    _span => {
       const service = didDoc.service?.find(
-        (s) => s.type === "AtprotoPersonalDataServer",
+        s => s.type === 'AtprotoPersonalDataServer',
       );
       if (!service) return null;
       return service.serviceEndpoint;
@@ -75,13 +75,13 @@ export const getPdsUrl = (didDoc: DidDocument) =>
 export const verifyCid = async (cid: string, blob: Blob) =>
   Sentry.startSpan(
     {
-      op: "atproto.verifyCid",
+      op: 'atproto.verifyCid',
       name: `${cid}`,
       attributes: {
-        "atproto.cid": cid,
+        'atproto.cid': cid,
       },
     },
-    async (_span) => {
+    async _span => {
       const strCid = atcuteCid.fromString(cid);
       const blobCid = await atcuteCid.create(
         strCid.codec as 85 | 113,
@@ -99,20 +99,20 @@ export const pullAndVerifyCid = async (
 ) =>
   Sentry.startSpan(
     {
-      op: "atproto.pullAndVerifyCid",
+      op: 'atproto.pullAndVerifyCid',
       name: `${did}/${cid}`,
       attributes: {
-        "atproto.did": did,
-        "atproto.cid": cid,
+        'atproto.did': did,
+        'atproto.cid': cid,
       },
     },
-    async (_span) => {
+    async _span => {
       const cachedVerify = await getCachedBlobVerification(pdsUrl, did, cid);
       if (cachedVerify) {
         return cachedVerify;
       }
 
-      const blobData = await getBlobCached(pdsUrl, did, cid, "raw");
+      const blobData = await getBlobCached(pdsUrl, did, cid, 'raw');
       const verified = await verifyCid(cid, blobData);
       await setCachedBlobVerification(pdsUrl, did, cid, verified);
       return verified;
