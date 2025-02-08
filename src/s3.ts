@@ -4,6 +4,7 @@ import {
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
+import * as Sentry from '@sentry/bun';
 import { getBlob } from './blob';
 import type { Preset } from './presets';
 
@@ -39,23 +40,64 @@ export const getBlobCached = async (
   return blobData;
 };
 
-export const getCachedBlob = async (
+export const putCachedBlob = async (
   did: string,
   cid: string,
   preset: Preset,
-) => {
-  try {
-    const cmd = new GetObjectCommand({
-      Bucket: BLOB_CACHE_BUCKET,
-      Key: `${preset}/${did}/${cid}`,
-    });
-    const res = await client.send(cmd);
-    if (!res.Body || !res.Metadata) return null;
+  blob: Blob,
+) =>
+  Sentry.startSpan(
+    {
+      op: 'cache.put',
+      name: `${preset}/${did}/${cid}`,
+      attributes: {
+        'cache.key': `${preset}/${did}/${cid}`,
+        'cache.item_size': blob.length,
+      },
+    },
+    async _span => {
+      const cmd = new PutObjectCommand({
+        Bucket: BLOB_CACHE_BUCKET,
+        Key: `${preset}/${did}/${cid}`,
+        Body: await blob.bytes(),
+        Metadata: {
+          'Content-Type': blob.type,
+        },
+      });
+      await client.send(cmd);
+    },
+  );
 
-    const bytes = await res.Body.transformToByteArray();
-    return new Blob([bytes], { type: res.Metadata['content-type'] });
-  } catch (err) {
-    if (err instanceof NoSuchKey) return null;
-    throw err;
-  }
-};
+export const getCachedBlob = async (did: string, cid: string, preset: Preset) =>
+  Sentry.startSpan(
+    {
+      op: 'cache.get',
+      name: `${preset}/${did}/${cid}`,
+      attributes: {
+        'cache.key': `${preset}/${did}/${cid}`,
+      },
+    },
+    async span => {
+      try {
+        const cmd = new GetObjectCommand({
+          Bucket: BLOB_CACHE_BUCKET,
+          Key: `${preset}/${did}/${cid}`,
+        });
+        const res = await client.send(cmd);
+        if (!res.Body || !res.Metadata) return null;
+
+        const bytes = await res.Body.transformToByteArray();
+
+        span.setAttribute('cache.hit', true);
+        span.setAttribute('cache.item_size', bytes.byteLength);
+
+        return new Blob([bytes], { type: res.Metadata['content-type'] });
+      } catch (err) {
+        if (err instanceof NoSuchKey) {
+          span.setAttribute('cache.hit', false);
+          return null;
+        }
+        throw err;
+      }
+    },
+  );
